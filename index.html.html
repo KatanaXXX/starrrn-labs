@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>STARRRN Labs — System Interface</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --gold: #D4AF37;
+    --gold-glow: #f0c93a;
+    --black: #0A0A0A;
+    --blue: #00BFFF;
+    --amber: #FFB347;
+    --border: rgba(212,175,55,0.35);
+    --text: #e0e0e0;
+  }
+
+  /* FORCE CUSTOM CURSOR EVERYWHERE */
+  *, *::before, *::after {
+    box-sizing: border-box; margin: 0; padding: 0;
+    cursor: none !important;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--black);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* CURSOR */
+  #cursor {
+    position: fixed; width: 22px; height: 22px;
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    pointer-events: none !important;
+    z-index: 999999;
+    left: -50px; top: -50px;
+    transform: translate(-50%, -50%);
+    transition: width 0.15s, height 0.15s, background 0.15s, border-color 0.15s;
+    box-shadow: 0 0 10px var(--gold), 0 0 25px rgba(212,175,55,0.35);
+    will-change: left, top;
+  }
+  #cursor.clicking {
+    width: 14px; height: 14px;
+    background: rgba(212,175,55,0.25);
+    border-color: var(--gold-glow);
+  }
+  #cursor.hovering {
+    width: 38px; height: 38px;
+    background: rgba(212,175,55,0.08);
+  }
+  #cursor-dot {
+    position: fixed; width: 4px; height: 4px;
+    background: var(--gold-glow);
+    border-radius: 50%;
+    pointer-events: none !important;
+    z-index: 999999;
+    left: -50px; top: -50px;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px var(--gold);
+    will-change: left, top;
+  }
+  #cursor-trail {
+    position: fixed; pointer-events: none !important;
+    z-index: 999998; left: 0; top: 0;
+  }
+
+  /* CANVAS */
+  #bg-canvas { position: fixed; inset: 0; z-index: 0; }
+  .scanline {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+  }
+
+  /* BOOT */
+  #boot-screen {
+    position: fixed; inset: 0; z-index: 10000;
+    background: var(--black);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+  }
+  .boot-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2rem, 6vw, 4rem); font-weight: 900;
+    color: var(--gold);
+    text-shadow: 0 0 30px var(--gold), 0 0 60px rgba(212,175,55,0.4);
+    letter-spacing: 0.3em; margin-bottom: 28px;
+    opacity: 0; animation: fadeIn 0.8s 0.3s forwards;
+  }
+  @keyframes fadeIn { to { opacity:1; } }
+  .boot-line { font-size: clamp(0.65rem,1.4vw,0.9rem); color: var(--gold); opacity: 0; white-space: nowrap; overflow: hidden; width: 0; }
+  .boot-bar-wrap { margin-top: 28px; width: min(400px,80vw); height: 3px; background: rgba(212,175,55,0.12); border-radius: 2px; overflow: hidden; opacity: 0; }
+  .boot-bar { height: 100%; background: linear-gradient(90deg,var(--gold),var(--gold-glow)); width: 0; box-shadow: 0 0 10px var(--gold); border-radius: 2px; transition: width 1.5s ease; }
+
+  /* APP */
+  #app { position: fixed; inset: 0; z-index: 10; display: flex; opacity: 0; pointer-events: none; transition: opacity 0.8s; }
+  #app.visible { opacity: 1; pointer-events: all; }
+
+  /* TOP BAR */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 50px;
+    background: rgba(8,8,8,0.97); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 20px; gap: 16px; z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .topbar-logo { font-family:'Orbitron',sans-serif; font-weight:700; font-size:0.82rem; color:var(--gold); letter-spacing:0.15em; text-shadow:0 0 10px var(--gold); }
+  .topbar-divider { flex:1; height:1px; background:var(--border); }
+  .topbar-status { display:flex; align-items:center; gap:7px; font-size:0.62rem; color:#4eff91; letter-spacing:0.1em; }
+  .status-dot { width:7px; height:7px; border-radius:50%; background:#4eff91; box-shadow:0 0 8px #4eff91; animation:pg 2s infinite; }
+  @keyframes pg { 0%,100%{opacity:1}50%{opacity:0.3} }
+  .topbar-time { font-size:0.62rem; color:rgba(212,175,55,0.65); letter-spacing:0.1em; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 200px; min-width: 200px; margin-top: 50px;
+    background: rgba(7,7,7,0.96); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 24px 0; gap: 4px;
+    backdrop-filter: blur(20px); flex-shrink: 0; position: relative; z-index: 50;
+  }
+  .nav-label { font-size:0.52rem; color:rgba(212,175,55,0.35); letter-spacing:0.25em; padding:0 22px 8px; text-transform:uppercase; }
+  .nav-item {
+    display:flex; align-items:center; gap:10px; padding:11px 22px;
+    font-size:0.72rem; letter-spacing:0.1em; color:rgba(212,175,55,0.55);
+    border-left:3px solid transparent; position:relative; text-transform:uppercase;
+    transition: all 0.2s;
+  }
+  .nav-item:hover, .nav-item.active {
+    color:var(--gold); border-left-color:var(--gold);
+    background:rgba(212,175,55,0.055); text-shadow:0 0 12px var(--gold);
+  }
+  .nav-icon { font-size:0.95rem; width:18px; text-align:center; }
+  .nav-ping { position:absolute; right:14px; top:50%; transform:translateY(-50%); width:6px; height:6px; border-radius:50%; background:var(--gold); box-shadow:0 0 6px var(--gold); animation:pg 2s infinite; }
+  .sidebar-radar { margin-top:auto; display:flex; justify-content:center; padding:18px 0; }
+  .radar-wrap { width:96px; height:96px; }
+  .radar-wrap svg { width:100%; height:100%; }
+
+  /* MAIN */
+  #main-panel { flex:1; margin-top:50px; margin-bottom:30px; overflow:hidden; position:relative; }
+  .panel { position:absolute; inset:0; padding:28px; overflow-y:auto; opacity:0; pointer-events:none; transform:translateX(18px); transition:opacity 0.35s, transform 0.35s; }
+  .panel.active { opacity:1; pointer-events:all; transform:translateX(0); }
+  .panel::-webkit-scrollbar { width:4px; }
+  .panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  /* GLASS CARD */
+  .glass-card { background:rgba(212,175,55,0.03); border:1px solid var(--border); border-radius:4px; backdrop-filter:blur(10px); padding:22px; position:relative; overflow:hidden; }
+  .glass-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); opacity:0.4; }
+
+  /* HOME */
+  .home-headline { font-family:'Orbitron',sans-serif; font-size:clamp(1.4rem,4vw,2.6rem); font-weight:900; color:var(--gold); text-shadow:0 0 30px rgba(212,175,55,0.5); line-height:1.2; margin-bottom:10px; }
+  .home-sub { font-size:0.82rem; color:rgba(224,224,224,0.5); letter-spacing:0.08em; margin-bottom:30px; }
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:28px; }
+  .stat-card { background:rgba(212,175,55,0.04); border:1px solid var(--border); border-radius:4px; padding:18px; text-align:center; position:relative; overflow:hidden; transition:all 0.3s; }
+  .stat-card:hover { border-color:var(--gold); box-shadow:0 0 20px rgba(212,175,55,0.12); }
+  .stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); animation:shimmer 3s infinite; }
+  @keyframes shimmer { 0%{opacity:0.2}50%{opacity:0.8}100%{opacity:0.2} }
+  .stat-num { font-family:'Orbitron',sans-serif; font-size:clamp(1.4rem,3vw,2rem); font-weight:700; color:var(--gold); text-shadow:0 0 18px rgba(212,175,55,0.4); }
+  .stat-label { font-size:0.57rem; color:rgba(212,175,55,0.45); letter-spacing:0.18em; margin-top:5px; text-transform:uppercase; }
+  .section-title { font-family:'Orbitron',sans-serif; font-size:0.67rem; font-weight:600; color:var(--gold); letter-spacing:0.3em; text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+  .section-title::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent); }
+  .features-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:20px; }
+  .feature-item { display:flex; align-items:flex-start; gap:10px; padding:14px; border:1px solid rgba(212,175,55,0.14); border-radius:4px; transition:all 0.3s; }
+  .feature-item:hover { border-color:var(--gold); background:rgba(212,175,55,0.05); box-shadow:0 0 18px rgba(212,175,55,0.09); }
+  .feature-icon { font-size:1.1rem; }
+  .feature-text h4 { font-family:'Orbitron',sans-serif; font-size:0.62rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:4px; }
+  .feature-text p { font-size:0.62rem; color:rgba(224,224,224,0.45); line-height:1.5; }
+  .btn-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
+  .btn-gold { padding:11px 26px; background:transparent; border:1px solid var(--gold); color:var(--gold); font-family:'Orbitron',sans-serif; font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; position:relative; overflow:hidden; transition:all 0.3s; }
+  .btn-gold::before { content:''; position:absolute; inset:0; background:var(--gold); transform:translateX(-100%); transition:transform 0.3s; z-index:-1; }
+  .btn-gold:hover { color:var(--black); box-shadow:0 0 22px rgba(212,175,55,0.4); }
+  .btn-gold:hover::before { transform:translateX(0); }
+  .btn-gold:active { transform:scale(0.97); }
+  .btn-outline { padding:11px 26px; background:transparent; border:1px solid rgba(212,175,55,0.28); color:rgba(212,175,55,0.58); font-family:'Orbitron',sans-serif; font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; transition:all 0.3s; }
+  .btn-outline:hover { border-color:var(--gold); color:var(--gold); box-shadow:0 0 14px rgba(212,175,55,0.18); }
+
+  /* ORG SECTION */
+  .org-headline { font-family:'Orbitron',sans-serif; font-size:clamp(1rem,2.5vw,1.5rem); font-weight:700; color:var(--gold); text-align:center; margin-bottom:6px; text-shadow:0 0 20px rgba(212,175,55,0.4); }
+  .org-sub { font-size:0.68rem; color:rgba(224,224,224,0.4); text-align:center; letter-spacing:0.1em; margin-bottom:24px; }
+  .org-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; }
+  .org-card { background:rgba(212,175,55,0.03); border:1px solid var(--border); border-radius:4px; padding:16px; text-align:center; transition:all 0.3s; position:relative; overflow:hidden; }
+  .org-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); opacity:0; transition:opacity 0.3s; }
+  .org-card:hover { border-color:var(--gold); background:rgba(212,175,55,0.06); box-shadow:0 0 20px rgba(212,175,55,0.1); transform:translateY(-2px); }
+  .org-card:hover::after { opacity:1; }
+  .org-icon { font-size:1.6rem; margin-bottom:8px; }
+  .org-name { font-family:'Orbitron',sans-serif; font-size:0.6rem; color:var(--gold); letter-spacing:0.08em; margin-bottom:4px; }
+  .org-div { font-size:0.57rem; color:rgba(212,175,55,0.45); letter-spacing:0.12em; }
+
+  /* PROJECTS */
+  .projects-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
+  .project-card { background:rgba(212,175,55,0.025); border:1px solid var(--border); border-radius:4px; padding:22px; transition:all 0.35s; position:relative; overflow:hidden; }
+  .project-card::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 0%,rgba(212,175,55,0.07),transparent 70%); opacity:0; transition:opacity 0.3s; }
+  .project-card:hover { border-color:var(--gold); transform:translateY(-4px); box-shadow:0 8px 36px rgba(212,175,55,0.14); }
+  .project-card:hover::before { opacity:1; }
+  .project-division { font-size:0.52rem; color:rgba(212,175,55,0.4); letter-spacing:0.2em; margin-bottom:4px; text-transform:uppercase; }
+  .project-tag { display:inline-block; padding:3px 9px; background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.28); font-size:0.52rem; letter-spacing:0.14em; color:var(--gold); border-radius:2px; margin-bottom:10px; text-transform:uppercase; }
+  .project-name { font-family:'Orbitron',sans-serif; font-size:0.82rem; color:var(--gold); margin-bottom:8px; letter-spacing:0.05em; }
+  .project-desc { font-size:0.62rem; color:rgba(224,224,224,0.45); line-height:1.65; margin-bottom:14px; }
+  .project-footer { display:flex; align-items:center; justify-content:space-between; }
+  .project-status { display:flex; align-items:center; gap:6px; font-size:0.55rem; color:#4eff91; letter-spacing:0.12em; }
+  .dot-green { width:5px; height:5px; border-radius:50%; background:#4eff91; box-shadow:0 0 6px #4eff91; animation:pg 2s infinite; }
+  .view-details { font-size:0.58rem; color:rgba(212,175,55,0.5); letter-spacing:0.1em; text-transform:uppercase; transition:all 0.2s; padding:4px 10px; border:1px solid rgba(212,175,55,0.2); border-radius:2px; }
+  .view-details:hover { color:var(--gold); border-color:var(--gold); background:rgba(212,175,55,0.06); }
+
+  /* PROJECT DETAIL MODAL */
+  #proj-modal {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+    backdrop-filter: blur(8px);
+  }
+  #proj-modal.open { opacity: 1; pointer-events: all; }
+  .modal-box {
+    background: rgba(10,10,10,0.98);
+    border: 1px solid var(--gold);
+    border-radius: 4px;
+    max-width: min(700px, 92vw);
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 36px;
+    position: relative;
+    box-shadow: 0 0 60px rgba(212,175,55,0.2);
+    animation: modalSlideIn 0.3s ease;
+  }
+  @keyframes modalSlideIn { from { transform:translateY(20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+  .modal-box::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); }
+  .modal-close { position:absolute; top:16px; right:20px; background:none; border:none; color:rgba(212,175,55,0.5); font-size:1.2rem; line-height:1; transition:color 0.2s; }
+  .modal-close:hover { color:var(--gold); }
+  .modal-tag { display:inline-block; padding:4px 12px; background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.28); font-size:0.55rem; letter-spacing:0.2em; color:var(--gold); border-radius:2px; margin-bottom:6px; text-transform:uppercase; }
+  .modal-division { font-size:0.55rem; color:rgba(212,175,55,0.4); letter-spacing:0.2em; margin-bottom:14px; text-transform:uppercase; }
+  .modal-name { font-family:'Orbitron',sans-serif; font-size:clamp(1.1rem,3vw,1.6rem); color:var(--gold); font-weight:700; text-shadow:0 0 20px rgba(212,175,55,0.4); margin-bottom:6px; letter-spacing:0.06em; }
+  .modal-status { display:flex; align-items:center; gap:7px; font-size:0.6rem; color:#4eff91; letter-spacing:0.12em; margin-bottom:24px; }
+  .modal-sep { height:1px; background:linear-gradient(90deg,var(--border),transparent); margin-bottom:20px; }
+  .modal-desc { font-size:0.75rem; color:rgba(224,224,224,0.7); line-height:1.8; margin-bottom:24px; }
+  .modal-specs { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  .spec-item { background:rgba(212,175,55,0.04); border:1px solid rgba(212,175,55,0.15); border-radius:3px; padding:12px 14px; }
+  .spec-label { font-size:0.55rem; color:rgba(212,175,55,0.4); letter-spacing:0.18em; text-transform:uppercase; margin-bottom:4px; }
+  .spec-val { font-size:0.7rem; color:var(--gold); }
+  .modal-box::-webkit-scrollbar { width:4px; }
+  .modal-box::-webkit-scrollbar-thumb { background:var(--border); }
+
+  /* AI SYSTEMS */
+  .systems-list { display:flex; flex-direction:column; gap:16px; }
+  .system-card { background:rgba(212,175,55,0.03); border:1px solid var(--border); border-radius:4px; padding:22px; transition:all 0.3s; }
+  .system-card:hover { border-color:var(--gold); box-shadow:0 0 28px rgba(212,175,55,0.09); }
+  .system-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .system-name { font-family:'Orbitron',sans-serif; font-size:0.82rem; color:var(--gold); letter-spacing:0.1em; }
+  .badge-online { padding:4px 10px; background:rgba(78,255,145,0.09); border:1px solid rgba(78,255,145,0.35); color:#4eff91; font-size:0.52rem; letter-spacing:0.18em; border-radius:2px; }
+  .badge-active { padding:4px 10px; background:rgba(0,191,255,0.09); border:1px solid rgba(0,191,255,0.35); color:var(--blue); font-size:0.52rem; letter-spacing:0.18em; border-radius:2px; }
+  .sys-bars { display:flex; flex-direction:column; gap:9px; }
+  .sys-bar-row { display:flex; align-items:center; gap:10px; }
+  .sys-bar-label { font-size:0.58rem; color:rgba(212,175,55,0.45); width:78px; letter-spacing:0.07em; flex-shrink:0; }
+  .sys-bar-track { flex:1; height:4px; background:rgba(212,175,55,0.09); border-radius:2px; overflow:hidden; }
+  .sys-bar-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--gold),var(--gold-glow)); box-shadow:0 0 8px var(--gold); animation:barGrow 1.5s ease forwards; }
+  @keyframes barGrow { from { width:0 !important; } }
+  .sys-bar-val { font-size:0.58rem; color:var(--gold); width:32px; text-align:right; }
+  .sys-desc { font-size:0.62rem; color:rgba(224,224,224,0.38); line-height:1.6; margin-top:10px; }
+
+  /* CONSOLE */
+  .console-header { display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .console-dot { width:10px; height:10px; border-radius:50%; }
+  .console-title { font-family:'Orbitron',sans-serif; font-size:0.78rem; color:var(--gold); letter-spacing:0.2em; margin-left:6px; }
+  #terminal-output { height:clamp(280px,44vh,480px); overflow-y:auto; margin-bottom:16px; padding:14px; background:rgba(0,0,0,0.55); border:1px solid rgba(212,175,55,0.18); border-radius:4px; font-size:clamp(0.62rem,1.1vw,0.72rem); line-height:1.8; }
+  #terminal-output::-webkit-scrollbar { width:4px; }
+  #terminal-output::-webkit-scrollbar-thumb { background:var(--border); }
+  .t-gold { color:var(--gold); } .t-green { color:#4eff91; } .t-blue { color:var(--blue); } .t-dim { color:rgba(224,224,224,0.32); } .t-white { color:var(--text); }
+  .terminal-input-row { display:flex; align-items:center; gap:8px; padding:9px 14px; background:rgba(0,0,0,0.48); border:1px solid var(--border); border-radius:4px; }
+  .terminal-prompt { color:var(--gold); font-size:0.78rem; white-space:nowrap; }
+  #terminal-input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:0.78rem; caret-color:var(--gold); }
+  .console-hint { margin-top:12px; display:flex; flex-wrap:wrap; gap:7px; }
+  .hint-chip { padding:4px 11px; background:rgba(212,175,55,0.05); border:1px solid rgba(212,175,55,0.18); border-radius:2px; font-size:0.58rem; color:rgba(212,175,55,0.55); letter-spacing:0.1em; transition:all 0.2s; }
+  .hint-chip:hover { border-color:var(--gold); color:var(--gold); background:rgba(212,175,55,0.09); }
+
+  /* CONTACT */
+  .contact-wrap { max-width:580px; }
+  .contact-title { font-family:'Orbitron',sans-serif; font-size:clamp(1.1rem,3vw,1.7rem); color:var(--gold); text-shadow:0 0 18px rgba(212,175,55,0.35); margin-bottom:6px; }
+  .contact-sub { font-size:0.67rem; color:rgba(224,224,224,0.38); letter-spacing:0.1em; margin-bottom:28px; }
+  .form-group { margin-bottom:18px; }
+  .form-label { display:block; font-size:0.57rem; color:var(--gold); letter-spacing:0.18em; margin-bottom:7px; text-transform:uppercase; }
+  .form-input, .form-textarea { width:100%; background:rgba(0,0,0,0.48); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:'Share Tech Mono',monospace; font-size:0.78rem; padding:11px 14px; outline:none; transition:all 0.3s; }
+  .form-input:focus, .form-textarea:focus { border-color:var(--gold); box-shadow:0 0 14px rgba(212,175,55,0.13); }
+  .form-textarea { min-height:110px; resize:vertical; }
+  .transmit-msg { margin-top:14px; font-size:0.68rem; color:#4eff91; opacity:0; transition:opacity 0.4s; }
+
+  /* STATUS BAR */
+  #statusbar { position:absolute; bottom:0; left:0; right:0; height:30px; background:rgba(7,7,7,0.98); border-top:1px solid var(--border); display:flex; align-items:center; padding:0 18px; gap:20px; z-index:100; font-size:0.53rem; color:rgba(212,175,55,0.38); letter-spacing:0.1em; }
+  .sb-item { display:flex; align-items:center; gap:5px; }
+  .sb-dot { width:5px; height:5px; border-radius:50%; background:#4eff91; box-shadow:0 0 5px #4eff91; }
+  .sb-sep { height:11px; width:1px; background:var(--border); }
+
+  /* MOBILE */
+  #hamburger { display:none; position:fixed; top:12px; left:14px; z-index:200; background:none; border:none; flex-direction:column; gap:5px; padding:3px; }
+  .hb-line { width:20px; height:2px; background:var(--gold); border-radius:1px; }
+  @media(max-width:768px) {
+    #hamburger { display:flex; }
+    #sidebar { position:fixed; left:-210px; top:50px; bottom:30px; z-index:150; transition:left 0.3s; width:200px; }
+    #sidebar.open { left:0; }
+    .stats-row { grid-template-columns:repeat(3,1fr); }
+    .features-grid { grid-template-columns:1fr; }
+    .projects-grid { grid-template-columns:1fr; }
+    .modal-specs { grid-template-columns:1fr; }
+    .org-grid { grid-template-columns:repeat(2,1fr); }
+    .topbar-time { display:none; }
+  }
+  @media(max-width:480px) {
+    .stats-row { grid-template-columns:1fr; }
+    .org-grid { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanline"></div>
+<div id="cursor"></div>
+<div id="cursor-dot"></div>
+
+<!-- BOOT -->
+<div id="boot-screen">
+  <div class="boot-logo">STARRRN LABS</div>
+  <div class="boot-line" id="b1">Initializing STARRRN OS v4.7.1...</div>
+  <div class="boot-line" id="b2">Loading modules: [neural_core] [vision_ai] [propulsion] [defense]...</div>
+  <div class="boot-line" id="b3">AI Core Online. ✓</div>
+  <div class="boot-line" id="b4">30 Divisions synchronized. ✓</div>
+  <div class="boot-line" id="b5">Establishing secure connection... ✓</div>
+  <div class="boot-line" id="b6" style="color:#4eff91">ACCESS GRANTED. Welcome, User.</div>
+  <div class="boot-bar-wrap" id="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <button id="hamburger" onclick="toggleSidebar()">
+    <div class="hb-line"></div><div class="hb-line"></div><div class="hb-line"></div>
+  </button>
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div class="topbar-logo">✦ STARRRN LABS</div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-status"><div class="status-dot"></div>SYSTEM OPTIMAL</div>
+    <div class="sb-sep"></div>
+    <div class="topbar-time" id="topbar-clock">00:00:00 UTC</div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="nav-label">Navigation</div>
+    <div class="nav-item active" onclick="showPanel('home',this)"><span class="nav-icon">⬡</span> Home<div class="nav-ping"></div></div>
+    <div class="nav-item" onclick="showPanel('projects',this)"><span class="nav-icon">◈</span> Projects</div>
+    <div class="nav-item" onclick="showPanel('ai',this)"><span class="nav-icon">◎</span> AI Systems</div>
+    <div class="nav-item" onclick="showPanel('console',this)"><span class="nav-icon">▶</span> Lab Console</div>
+    <div class="nav-item" onclick="showPanel('contact',this)"><span class="nav-icon">⬢</span> Contact</div>
+    <div class="sidebar-radar">
+      <div class="radar-wrap">
+        <svg viewBox="0 0 100 100">
+          <defs><radialGradient id="rg" cx="50%" cy="50%"><stop offset="0%" stop-color="#D4AF37" stop-opacity="0.12"/><stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/></radialGradient></defs>
+          <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(212,175,55,0.14)" stroke-width="1"/>
+          <circle cx="50" cy="50" r="34" fill="none" stroke="rgba(212,175,55,0.11)" stroke-width="1"/>
+          <circle cx="50" cy="50" r="20" fill="none" stroke="rgba(212,175,55,0.11)" stroke-width="1"/>
+          <line x1="50" y1="2" x2="50" y2="98" stroke="rgba(212,175,55,0.09)" stroke-width="1"/>
+          <line x1="2" y1="50" x2="98" y2="50" stroke="rgba(212,175,55,0.09)" stroke-width="1"/>
+          <g id="rsweep" style="transform-origin:50px 50px">
+            <path d="M50,50 L98,50 A48,48 0 0,0 50,2 Z" fill="url(#rg)" opacity="0.7"/>
+          </g>
+          <circle cx="68" cy="30" r="2.5" fill="#4eff91" opacity="0.8"><animate attributeName="opacity" values="0.8;0.1;0.8" dur="3s" repeatCount="indefinite"/></circle>
+          <circle cx="38" cy="62" r="2" fill="#D4AF37" opacity="0.7"><animate attributeName="opacity" values="0.7;0.1;0.7" dur="2.2s" repeatCount="indefinite"/></circle>
+          <circle cx="72" cy="64" r="1.5" fill="#00BFFF" opacity="0.6"><animate attributeName="opacity" values="0.6;0.1;0.6" dur="4s" repeatCount="indefinite"/></circle>
+          <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="4s" repeatCount="indefinite" href="#rsweep"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div id="main-panel">
+
+    <!-- HOME -->
+    <div class="panel active" id="panel-home">
+      <div class="home-headline">STARRRN Labs<br/>Interface</div>
+      <div class="home-sub">▸ Engineering the future through AI, propulsion, and advanced defense systems. System Ready.</div>
+      <div class="btn-row">
+        <button class="btn-gold" onclick="showPanel('projects',document.querySelectorAll('.nav-item')[1])">Explore Projects</button>
+        <button class="btn-outline" onclick="showPanel('contact',document.querySelectorAll('.nav-item')[4])">Start a Project</button>
+      </div>
+      <br/>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-num" data-count="30">0</div><div class="stat-label">Active Divisions</div></div>
+        <div class="stat-card"><div class="stat-num" data-count="12">0</div><div class="stat-label">Systems Active</div></div>
+        <div class="stat-card"><div class="stat-num" data-count="8">0</div><div class="stat-label">AI Modules Running</div></div>
+      </div>
+
+      <div class="section-title">Core Capabilities</div>
+      <div class="features-grid">
+        <div class="feature-item"><div class="feature-icon">⚡</div><div class="feature-text"><h4>Fast Innovation</h4><p>Rapid prototyping from concept to working prototype. Speed is a feature.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">🧠</div><div class="feature-text"><h4>AI-First Thinking</h4><p>Every system is infused with neural intelligence and autonomous decision-making.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">🚀</div><div class="feature-text"><h4>Future-Focused</h4><p>We don't follow trends. We build what the world uses in five years.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">🔬</div><div class="feature-text"><h4>Experimental Mindset</h4><p>The lab never sleeps. Breakthroughs happen when you push the edge.</p></div></div>
+      </div>
+
+      <br/>
+      <div class="section-title">Our Organization</div>
+      <div class="org-headline">30 Divisions. One Mission.</div>
+      <div class="org-sub">▸ Every breakthrough is powered by specialized divisions working in concert — from reactor physics to AI.</div>
+      <div class="org-grid">
+        <div class="org-card"><div class="org-icon">🔋</div><div class="org-name">Energy Systems</div><div class="org-div">4 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">⚙️</div><div class="org-name">Mechanical Engineering</div><div class="org-div">4 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🔬</div><div class="org-name">Materials Science</div><div class="org-div">3 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🧲</div><div class="org-name">Electromagnetic Tech</div><div class="org-div">3 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🌡️</div><div class="org-name">Thermal Engineering</div><div class="org-div">2 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🤖</div><div class="org-name">Robotics & Automation</div><div class="org-div">3 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🧠</div><div class="org-name">AI & Computing</div><div class="org-div">3 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🛰️</div><div class="org-name">Aerospace Engineering</div><div class="org-div">3 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🛡️</div><div class="org-name">Defense & Security</div><div class="org-div">2 Divisions</div></div>
+        <div class="org-card"><div class="org-icon">🧪</div><div class="org-name">Experimental Research</div><div class="org-div">3 Divisions</div></div>
+      </div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div class="panel" id="panel-projects">
+      <div class="section-title">Active Projects — Prototype Division</div>
+      <div class="projects-grid" id="projects-grid">
+        <!-- Injected by JS -->
+      </div>
+    </div>
+
+    <!-- AI SYSTEMS -->
+    <div class="panel" id="panel-ai">
+      <div class="section-title">AI System Status</div>
+      <div class="systems-list">
+        <div class="system-card glass-card">
+          <div class="system-header"><div class="system-name">◎ Neural Engine</div><div class="badge-online">ONLINE</div></div>
+          <div class="sys-bars">
+            <div class="sys-bar-row"><div class="sys-bar-label">Processing</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:87%"></div></div><div class="sys-bar-val">87%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Memory</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:63%"></div></div><div class="sys-bar-val">63%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Throughput</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:91%"></div></div><div class="sys-bar-val">91%</div></div>
+          </div>
+          <div class="sys-desc">Core language and reasoning engine. Processes 2.4M tokens/s across distributed inference nodes.</div>
+        </div>
+        <div class="system-card glass-card">
+          <div class="system-header"><div class="system-name">◈ Vision AI</div><div class="badge-active">ACTIVE</div></div>
+          <div class="sys-bars">
+            <div class="sys-bar-row"><div class="sys-bar-label">Detection</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:95%"></div></div><div class="sys-bar-val">95%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Latency</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:78%"></div></div><div class="sys-bar-val">78%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Accuracy</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:99%"></div></div><div class="sys-bar-val">99%</div></div>
+          </div>
+          <div class="sys-desc">Multi-modal vision processing stack. Real-time inference at 240fps with sub-4ms latency.</div>
+        </div>
+        <div class="system-card glass-card">
+          <div class="system-header"><div class="system-name">⬡ Automation Core</div><div class="badge-online">ONLINE</div></div>
+          <div class="sys-bars">
+            <div class="sys-bar-row"><div class="sys-bar-label">Tasks Run</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:74%"></div></div><div class="sys-bar-val">74%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Queue</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:22%"></div></div><div class="sys-bar-val">22%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Efficiency</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:96%"></div></div><div class="sys-bar-val">96%</div></div>
+          </div>
+          <div class="sys-desc">Autonomous task orchestration. Manages 1,400+ workflows concurrently with zero human intervention.</div>
+        </div>
+        <div class="system-card glass-card">
+          <div class="system-header"><div class="system-name">⬢ S.T.A.R.F.A.L.L AI Core</div><div class="badge-active">ACTIVE</div></div>
+          <div class="sys-bars">
+            <div class="sys-bar-row"><div class="sys-bar-label">Threat Detect</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:98%"></div></div><div class="sys-bar-val">98%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">HUD Targeting</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:94%"></div></div><div class="sys-bar-val">94%</div></div>
+            <div class="sys-bar-row"><div class="sys-bar-label">Assembly AI</div><div class="sys-bar-track"><div class="sys-bar-fill" style="width:88%"></div></div><div class="sys-bar-val">88%</div></div>
+          </div>
+          <div class="sys-desc">Onboard AI for the S.T.A.R.F.A.L.L Suit and MECH. Handles threat detection, HUD targeting, and autonomous assembly coordination.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSOLE -->
+    <div class="panel" id="panel-console">
+      <div class="glass-card">
+        <div class="console-header">
+          <div class="console-dot" style="background:#ff5f57"></div>
+          <div class="console-dot" style="background:#febc2e"></div>
+          <div class="console-dot" style="background:#28c840"></div>
+          <div class="console-title">LAB CONSOLE v4.7</div>
+        </div>
+        <div id="terminal-output"></div>
+        <div class="terminal-input-row">
+          <div class="terminal-prompt">STARRRN:~$</div>
+          <input type="text" id="terminal-input" placeholder="Type a command..." autocomplete="off" spellcheck="false"/>
+        </div>
+        <div class="console-hint">
+          <span class="hint-chip" onclick="runCmd('help')">help</span>
+          <span class="hint-chip" onclick="runCmd('status')">status</span>
+          <span class="hint-chip" onclick="runCmd('projects')">projects</span>
+          <span class="hint-chip" onclick="runCmd('launch ai')">launch ai</span>
+          <span class="hint-chip" onclick="runCmd('systems')">systems</span>
+          <span class="hint-chip" onclick="runCmd('divisions')">divisions</span>
+          <span class="hint-chip" onclick="runCmd('whoami')">whoami</span>
+          <span class="hint-chip" onclick="runCmd('scan')">scan</span>
+          <span class="hint-chip" onclick="runCmd('clear')">clear</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTACT -->
+    <div class="panel" id="panel-contact">
+      <div class="contact-wrap">
+        <div class="contact-title">Transmit a Message</div>
+        <div class="contact-sub">▸ Establish a secure channel with STARRRN Labs. All transmissions are encrypted end-to-end.</div>
+        <div class="glass-card">
+          <div class="form-group"><label class="form-label">Identifier (Name)</label><input type="text" class="form-input" placeholder="Your name or handle"/></div>
+          <div class="form-group"><label class="form-label">Frequency (Email)</label><input type="email" class="form-input" placeholder="your@email.com"/></div>
+          <div class="form-group"><label class="form-label">Transmission (Message)</label><textarea class="form-textarea" placeholder="Describe your project, collaboration, or idea..."></textarea></div>
+          <button class="btn-gold" onclick="transmit()">⬢ Transmit Message</button>
+          <div class="transmit-msg" id="transmit-msg">✓ Transmission received. We'll make contact shortly.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="statusbar">
+    <div class="sb-item"><div class="sb-dot"></div>SYSTEM STATUS: OPTIMAL</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">30 DIVISIONS ONLINE</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">UPTIME: <span id="uptime">00:00:00</span></div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">STARRRN OS v4.7.1</div>
+  </div>
+</div>
+
+<!-- PROJECT DETAIL MODAL -->
+<div id="proj-modal" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box">
+    <button class="modal-close" onclick="document.getElementById('proj-modal').classList.remove('open')">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ===== CURSOR — ALWAYS ON =====
+const cursor = document.getElementById('cursor');
+const cursorDot = document.getElementById('cursor-dot');
+let mx = -100, my = -100;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top = my + 'px';
+  cursorDot.style.left = mx + 'px';
+  cursorDot.style.top = my + 'px';
+}, { passive: true });
+
+document.addEventListener('mousedown', () => cursor.classList.add('clicking'));
+document.addEventListener('mouseup', () => cursor.classList.remove('clicking'));
+
+// Keep cursor visible on all interactive elements
+function attachHover(sel) {
+  document.querySelectorAll(sel).forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('hovering'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('hovering'));
+  });
+}
+function bindAllHovers() {
+  attachHover('button, .nav-item, .hint-chip, .project-card, .view-details, .feature-item, .org-card, .stat-card, .system-card, .btn-gold, .btn-outline, input, textarea, a');
+}
+
+// ===== CANVAS BACKGROUND =====
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H, particles = [], stars = [];
+
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+for (let i = 0; i < 130; i++) stars.push({ x: Math.random(), y: Math.random(), r: Math.random()*1.2, a: Math.random() });
+for (let i = 0; i < 90; i++) particles.push(mkP());
+function mkP() {
+  return { x: Math.random()*1920, y: Math.random()*1080, vx:(Math.random()-0.5)*0.38, vy:(Math.random()-0.5)*0.38, r:Math.random()*1.4+0.4, a:Math.random()*0.45+0.1, col: Math.random()>0.6?'212,175,55':'0,191,255' };
+}
+
+function drawGrid() {
+  ctx.strokeStyle='rgba(212,175,55,0.038)'; ctx.lineWidth=1;
+  for (let x=0;x<W;x+=52){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for (let y=0;y<H;y+=52){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+}
+
+function animBG() {
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0A0A0A'; ctx.fillRect(0,0,W,H);
+  drawGrid();
+  stars.forEach(s => {
+    s.a += 0.003*(Math.random()>0.5?1:-1);
+    s.a = Math.max(0.04, Math.min(0.85, s.a));
+    ctx.beginPath(); ctx.arc(s.x*W, s.y*H, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(212,175,55,${s.a})`; ctx.fill();
+  });
+  particles.forEach(p => {
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.col},${p.a})`; ctx.fill();
+  });
+  for(let i=0;i<particles.length;i++){
+    for(let j=i+1;j<particles.length;j++){
+      const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<95){ ctx.strokeStyle=`rgba(212,175,55,${0.07*(1-d/95)})`; ctx.lineWidth=0.5; ctx.beginPath(); ctx.moveTo(particles[i].x,particles[i].y); ctx.lineTo(particles[j].x,particles[j].y); ctx.stroke(); }
+    }
+  }
+  requestAnimationFrame(animBG);
+}
+animBG();
+
+// ===== PROJECTS DATA =====
+const PROJECTS = [
+  {
+    id: 'hybrid-jet',
+    tag: 'Prototype', division: 'Propulsion Division',
+    name: 'Hybrid Jet Engines',
+    shortDesc: 'Dual-cycle turbine system with integrated electric motor for 40% greater fuel efficiency and dramatically reduced thermal signature.',
+    fullDesc: 'Two distinct engine designs that use a dual-cycle system — a traditional turbine core generates thrust while an integrated electric motor recaptures exhaust energy to power secondary compressors. This closed-loop system increases fuel efficiency by up to 40% and dramatically reduces thermal signature.',
+    status: 'PROTOTYPE',
+    specs: [{ l:'Efficiency Gain', v:'+40% vs baseline' }, { l:'System Type', v:'Dual-cycle closed-loop' }, { l:'Thermal Output', v:'Dramatically reduced' }, { l:'Stage', v:'Active Prototype' }]
+  },
+  {
+    id: 'super-magnet',
+    tag: 'Prototype', division: 'Energy Division',
+    name: 'Super Magnet Array',
+    shortDesc: 'Toroidal superconducting magnet array using stacked rare-earth coils to generate a sustained high-density magnetic field for directed energy applications.',
+    fullDesc: 'A toroidal superconducting magnet array using stacked rare-earth coils to generate a sustained high-density magnetic field. Energy is fed from multiple generator banks while a magnetar-class core focuses and amplifies the field for directed energy applications.',
+    status: 'PROTOTYPE',
+    specs: [{ l:'Array Type', v:'Toroidal superconducting' }, { l:'Coil Material', v:'Stacked rare-earth' }, { l:'Field Class', v:'Magnetar-class core' }, { l:'Application', v:'Directed energy' }]
+  },
+  {
+    id: 'starfall-suit',
+    tag: 'Prototype', division: 'Wearable Systems',
+    name: 'S.T.A.R.F.A.L.L Suit',
+    shortDesc: 'Full-body powered exosuit with modular black and gold plating, micro-repulsor flight system, and onboard AI for threat detection and HUD targeting.',
+    fullDesc: 'A full-body powered exosuit with modular black and gold plating over a titanium-composite endoskeleton. Micro-repulsors in the palms and boots provide stabilized flight, while an onboard AI handles threat detection, HUD targeting, and autonomous assembly.',
+    status: 'PROTOTYPE',
+    specs: [{ l:'Frame', v:'Titanium-composite endo' }, { l:'Plating', v:'Modular black & gold' }, { l:'Propulsion', v:'Micro-repulsors (palm + boot)' }, { l:'AI', v:'Threat detect + HUD targeting' }]
+  },
+  {
+    id: 'starfall-mech',
+    tag: 'Prototype', division: 'Heavy Systems',
+    name: 'S.T.A.R.F.A.L.L MECH',
+    shortDesc: '10-foot heavy-class mechanized platform with titanium-alloy plating, hydraulic exo-frame, arc reactor power, and pressure-sealed cockpit controls.',
+    fullDesc: 'A 10-foot heavy-class mechanized platform with reinforced titanium-alloy plating and a hydraulic exo-frame capable of lifting 20+ tons. Powered by a miniaturized arc reactor with servo-driven joints and pressure-sealed cockpit controls.',
+    status: 'PROTOTYPE',
+    specs: [{ l:'Height', v:'10 feet' }, { l:'Lift Capacity', v:'20+ tons' }, { l:'Power Source', v:'Miniaturized arc reactor' }, { l:'Frame', v:'Hydraulic exo-frame' }]
+  },
+  {
+    id: 'thunderbird',
+    tag: 'Prototype', division: 'Aerospace Division',
+    name: 'Thunderbird',
+    shortDesc: 'Twin-engine stealth recon jet with blended delta-wing body, Mach 3.5+ cruising at 85,000 ft, radar-absorbing skin and hybrid turbine-ramjet engines.',
+    fullDesc: 'A twin-engine stealth reconnaissance jet with a blended delta-wing body designed for Mach 3.5+ cruising at 85,000 feet. Uses radar-absorbing composite skin and heat-dissipating ceramic tiles with hybrid turbine-ramjet engines.',
+    status: 'PROTOTYPE',
+    specs: [{ l:'Top Speed', v:'Mach 3.5+' }, { l:'Ceiling', v:'85,000 ft' }, { l:'Engine', v:'Hybrid turbine-ramjet' }, { l:'Stealth', v:'Radar-absorbing composite' }]
+  },
+  {
+    id: 'energy-grid',
+    tag: 'Prototype', division: 'Energy Systems Division',
+    name: 'Energy Systems Grid',
+    shortDesc: 'Facility-wide intelligent power distribution network with AI-driven load balancing, ultra-dense storage banks, and fault-tolerant switching across all 30 divisions.',
+    fullDesc: 'A facility-wide intelligent power distribution network that routes reactor output to every lab, fabrication bay, and prototype system. Features ultra-dense storage banks, AI-driven load balancing, and fault-tolerant switching across all 30 divisions.',
+    status: 'ACTIVE',
+    specs: [{ l:'Coverage', v:'All 30 divisions' }, { l:'Balancing', v:'AI-driven dynamic load' }, { l:'Redundancy', v:'Fault-tolerant switching' }, { l:'Storage', v:'Ultra-dense banks' }]
+  }
+];
+
+// ===== RENDER PROJECTS =====
+function renderProjects() {
+  const grid = document.getElementById('projects-grid');
+  grid.innerHTML = PROJECTS.map(p => `
+    <div class="project-card">
+      <div class="project-division">${p.division}</div>
+      <div class="project-tag">${p.tag}</div>
+      <div class="project-name">${p.name}</div>
+      <div class="project-desc">${p.shortDesc}</div>
+      <div class="project-footer">
+        <div class="project-status"><div class="dot-green"></div>${p.status}</div>
+        <div class="view-details" onclick="openModal('${p.id}')">View Details →</div>
+      </div>
+    </div>
+  `).join('');
+  bindAllHovers();
+}
+
+// ===== MODAL =====
+function openModal(id) {
+  const p = PROJECTS.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-tag">${p.tag}</div>
+    <div class="modal-division">${p.division}</div>
+    <div class="modal-name">${p.name}</div>
+    <div class="modal-status"><div class="dot-green"></div>STATUS: ${p.status}</div>
+    <div class="modal-sep"></div>
+    <div class="modal-desc">${p.fullDesc}</div>
+    <div class="section-title" style="margin-bottom:12px">Specifications</div>
+    <div class="modal-specs">
+      ${p.specs.map(s=>`<div class="spec-item"><div class="spec-label">${s.l}</div><div class="spec-val">${s.v}</div></div>`).join('')}
+    </div>
+  `;
+  document.getElementById('proj-modal').classList.add('open');
+  bindAllHovers();
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('proj-modal')) {
+    document.getElementById('proj-modal').classList.remove('open');
+  }
+}
+
+// ===== PANEL NAV =====
+function showPanel(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+}
+
+// ===== BOOT =====
+function typeBootLine(el, text, delay, speed=26) {
+  return new Promise(res => {
+    setTimeout(() => {
+      el.style.opacity='1';
+      let i=0;
+      const iv = setInterval(()=>{
+        el.style.width='auto';
+        el.textContent=text.slice(0,++i);
+        if(i>=text.length){ clearInterval(iv); setTimeout(res,180); }
+      }, speed);
+    }, delay);
+  });
+}
+async function bootSequence() {
+  const lines=[
+    {el:'b1',text:'Initializing STARRRN OS v4.7.1...',delay:400},
+    {el:'b2',text:'Loading modules: [neural_core] [vision_ai] [propulsion] [defense]...',delay:1100},
+    {el:'b3',text:'AI Core Online. ✓',delay:2100},
+    {el:'b4',text:'30 Divisions synchronized. ✓',delay:2900},
+    {el:'b5',text:'Establishing secure connection... ✓',delay:3700},
+    {el:'b6',text:'ACCESS GRANTED. Welcome, User.',delay:4500},
+  ];
+  for(const l of lines) await typeBootLine(document.getElementById(l.el), l.text, l.delay);
+  setTimeout(()=>{
+    const w=document.getElementById('boot-bar-wrap'), b=document.getElementById('boot-bar');
+    w.style.opacity='1'; setTimeout(()=>{ b.style.width='100%'; }, 80);
+  }, 5100);
+  setTimeout(()=>{
+    const boot=document.getElementById('boot-screen');
+    boot.style.transition='opacity 0.8s'; boot.style.opacity='0';
+    setTimeout(()=>{
+      boot.style.display='none';
+      document.getElementById('app').classList.add('visible');
+      animateCounters();
+      initConsole();
+      renderProjects();
+      bindAllHovers();
+    }, 800);
+  }, 6600);
+}
+bootSequence();
+
+// ===== COUNTERS =====
+function animateCounters() {
+  document.querySelectorAll('[data-count]').forEach(el=>{
+    const target=parseInt(el.dataset.count); let n=0;
+    const step=Math.ceil(target/40);
+    const iv=setInterval(()=>{ n=Math.min(n+step,target); el.textContent=n; if(n>=target)clearInterval(iv); }, 35);
+  });
+}
+
+// ===== CLOCK =====
+function updateClock() {
+  const now=new Date();
+  document.getElementById('topbar-clock').textContent=
+    `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')} UTC`;
+}
+setInterval(updateClock,1000); updateClock();
+
+// ===== UPTIME =====
+let uptimeSecs=0;
+setInterval(()=>{
+  uptimeSecs++;
+  const h=Math.floor(uptimeSecs/3600), m=Math.floor((uptimeSecs%3600)/60), s=uptimeSecs%60;
+  document.getElementById('uptime').textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+},1000);
+
+// ===== MOBILE =====
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ===== TERMINAL =====
+const CMDS = {
+  help:[
+    {t:'Available commands:', c:'gold'},
+    {t:'  help       — Show this help menu',c:'dim'},
+    {t:'  status     — System status overview',c:'dim'},
+    {t:'  projects   — List all projects',c:'dim'},
+    {t:'  launch ai  — Initialize AI systems',c:'dim'},
+    {t:'  systems    — AI system metrics',c:'dim'},
+    {t:'  divisions  — List all 30 divisions',c:'dim'},
+    {t:'  whoami     — Identify current user',c:'dim'},
+    {t:'  ping       — Check network latency',c:'dim'},
+    {t:'  scan       — Environment security scan',c:'dim'},
+    {t:'  clear      — Clear terminal',c:'dim'},
+  ],
+  status:[
+    {t:'◆ STARRRN OS v4.7.1 — All systems nominal.',c:'green'},
+    {t:'  Neural Engine..........ONLINE  [87% load]',c:'white'},
+    {t:'  Vision AI..............ACTIVE  [95% acc]',c:'white'},
+    {t:'  Automation Core........ONLINE  [96% eff]',c:'white'},
+    {t:'  S.T.A.R.F.A.L.L AI....ACTIVE  [98% det]',c:'white'},
+    {t:'  Energy Grid...........OPTIMAL  [all 30 div]',c:'white'},
+    {t:'Overall: SYSTEM STATUS OPTIMAL ✓',c:'green'},
+  ],
+  projects:[
+    {t:'Loading project manifest...',c:'gold'},
+    {t:'  [1] Hybrid Jet Engines    — Propulsion Div    [PROTOTYPE]',c:'white'},
+    {t:'  [2] Super Magnet Array    — Energy Div        [PROTOTYPE]',c:'white'},
+    {t:'  [3] S.T.A.R.F.A.L.L Suit — Wearable Systems  [PROTOTYPE]',c:'white'},
+    {t:'  [4] S.T.A.R.F.A.L.L MECH — Heavy Systems     [PROTOTYPE]',c:'white'},
+    {t:'  [5] Thunderbird           — Aerospace Div     [PROTOTYPE]',c:'white'},
+    {t:'  [6] Energy Systems Grid   — Energy Systems    [ACTIVE]',c:'white'},
+    {t:'6 prototypes loaded. Innovation never stops.',c:'green'},
+  ],
+  'launch ai':[
+    {t:'Launching AI subsystems...',c:'gold'},
+    {t:'Loading neural weights...............OK',c:'dim'},
+    {t:'Warming inference engine..............OK',c:'dim'},
+    {t:'Connecting to distributed nodes......OK',c:'dim'},
+    {t:'Calibrating S.T.A.R.F.A.L.L AI......OK',c:'dim'},
+    {t:'Syncing vision sensors................OK',c:'dim'},
+    {t:'◆ AI fully active. All modules online.',c:'green'},
+  ],
+  systems:[
+    {t:'Querying AI system metrics...',c:'gold'},
+    {t:'  Neural Engine   | CPU:87% | MEM:63% | TPUT:91%',c:'blue'},
+    {t:'  Vision AI       | DET:95% | LAT:78% | ACC:99%',c:'blue'},
+    {t:'  Automation Core | TASKS:74% | QUEUE:22% | EFF:96%',c:'blue'},
+    {t:'  STARFALL AI     | THREAT:98% | HUD:94% | ASSM:88%',c:'blue'},
+    {t:'All systems within optimal parameters.',c:'green'},
+  ],
+  divisions:[
+    {t:'STARRRN Labs — 30 Divisions Online:',c:'gold'},
+    {t:'  🔋 Energy Systems         (4 Divisions)',c:'white'},
+    {t:'  ⚙️  Mechanical Engineering  (4 Divisions)',c:'white'},
+    {t:'  🔬 Materials Science       (3 Divisions)',c:'white'},
+    {t:'  🧲 Electromagnetic Tech    (3 Divisions)',c:'white'},
+    {t:'  🌡️  Thermal Engineering     (2 Divisions)',c:'white'},
+    {t:'  🤖 Robotics & Automation   (3 Divisions)',c:'white'},
+    {t:'  🧠 AI & Computing          (3 Divisions)',c:'white'},
+    {t:'  🛰️  Aerospace Engineering   (3 Divisions)',c:'white'},
+    {t:'  🛡️  Defense & Security      (2 Divisions)',c:'white'},
+    {t:'  🧪 Experimental Research   (3 Divisions)',c:'white'},
+    {t:'Total: 30 divisions. One mission.',c:'green'},
+  ],
+  whoami:[
+    {t:'Identifying user...',c:'dim'},
+    {t:'User Class: Authorized Personnel',c:'gold'},
+    {t:'Clearance: LEVEL 5 — FULL ACCESS',c:'green'},
+    {t:'Location: STARRRN Labs — Main Terminal',c:'white'},
+    {t:'Session: Secure + Encrypted',c:'white'},
+  ],
+  ping:[
+    {t:'PING starrrn.labs — 3 packets',c:'dim'},
+    {t:'Reply from 10.0.0.1: time=2ms',c:'green'},
+    {t:'Reply from 10.0.0.1: time=1ms',c:'green'},
+    {t:'Reply from 10.0.0.1: time=3ms',c:'green'},
+    {t:'Avg latency: 2ms — Connection optimal.',c:'gold'},
+  ],
+  scan:[
+    {t:'Initiating environment scan...',c:'gold'},
+    {t:'Scanning network topology.............CLEAR',c:'dim'},
+    {t:'Checking for intrusion attempts.......NONE',c:'dim'},
+    {t:'Analyzing system integrity.............PASS',c:'dim'},
+    {t:'Validating AI model checksums..........PASS',c:'dim'},
+    {t:'◆ Scan complete. Environment secure.',c:'green'},
+  ]
+};
+
+function initConsole() {
+  const output=document.getElementById('terminal-output');
+  const input=document.getElementById('terminal-input');
+  [{t:'╔══════════════════════════════════════╗',c:'gold'},{t:'║  STARRRN LABS — LAB CONSOLE v4.7     ║',c:'gold'},{t:'╚══════════════════════════════════════╝',c:'gold'},{t:'Secure terminal initialized. Type "help" for commands.',c:'dim'},{t:'',c:'dim'}].forEach(l=>appendLine(l.t,l.c));
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      const cmd=input.value.trim().toLowerCase(); if(!cmd)return;
+      appendLine(`STARRRN:~$ ${cmd}`,'gold'); input.value='';
+      if(cmd==='clear'){output.innerHTML='';return;}
+      const resp=CMDS[cmd];
+      if(resp) animLines(resp);
+      else appendLine(`Command not found: "${cmd}". Type "help" for available commands.`,'dim');
+    }
+  });
+}
+function runCmd(cmd){ const i=document.getElementById('terminal-input'); i.value=cmd; i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); }
+function appendLine(text,cls='white'){
+  const out=document.getElementById('terminal-output');
+  const l=document.createElement('div'); l.className='t-'+cls; l.textContent=text;
+  out.appendChild(l); out.scrollTop=out.scrollHeight;
+}
+function animLines(lines,i=0){
+  if(i>=lines.length)return;
+  setTimeout(()=>{ appendLine(lines[i].t,lines[i].c); animLines(lines,i+1); }, i===0?80:110+Math.random()*70);
+}
+
+// ===== CONTACT =====
+function transmit(){
+  const m=document.getElementById('transmit-msg');
+  m.style.opacity='1'; setTimeout(()=>m.style.opacity='0',4000);
+}
+</script>
+</body>
+</html>
